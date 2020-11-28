@@ -222,15 +222,22 @@
               # Calling this function with each argument combination:
               ( { ghcver, ... } @ vargs:
                 with builtins;
-                let ghcverInps = drvArgs:
+                let ghcverInps = drvArgs: pathArgs:
                       let ghcverInp = n:
-                            # KWQ: this propagages the ghcver selection, but not the others (e.g. llvmver)
                             let s1 = builtins.trace vargs (builtins.trace "ghcverInp in ${ghcver} for ${n}" drvArgs.${n});
                                 outloc = x: if hasAttr "outputs" x
                                             then (if (builtins.isAttrs x.outputs)
-                                                  then x.outputs.packages.${system}.${n}.${ghcver}
+                                                  then pathloc (x.outputs.packages.${system}.${n})
+                                                    (builtins.attrNames pathArgs)
                                                   else x)
                                             else x;
+                                pathloc = x: remNames:
+                                  if remNames == [] then x
+                                  else let thisNm  = builtins.head remNames;
+                                           remNm   = builtins.tail remNames;
+                                           thisVal = pathArgs.${thisNm};
+                                           step    = x.${thisVal} or x;
+                                       in pathloc step remNm;
                                 defloc = x: x.default or x;
                             in outloc (defloc (outloc s1));
                           argNames = attrNames drvArgs;
@@ -239,7 +246,7 @@
                     args = if isFunction ovrargs
                            then ovrargs vargs
                            else (if isAttrs ovrargs
-                                 then ghcverInps ovrargs
+                                 then ghcverInps ovrargs vargs
                                  else ovrargs);
                     callPkg = pkgs.haskell.packages.${ghcver}.callPackage;
                     hpkg = callPkg (fromCabal { inherit pkgs name src ghcver configFlags; }) args;
