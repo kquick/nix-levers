@@ -215,41 +215,37 @@
             adjDrv = ovrDrvOrArgs.adjustDrv or (va: drv: drv);
             adjCfg = drv: pkgs.haskell.lib.appendConfigureFlags drv
               (ovrDrvOrArgs.configFlags or []);
-        in
-          variedTargets
-            # Vary over additional user arguments plus the known GHC versions
-            (varargs // { ghcver = ghcver; })
-            # Calling this function with each argument combination:
-            ( { ghcver, ... } @ vargs:
-              with builtins;
-              let ghcverInps = drvArgs:
-                    let ghcverInp = n:
-                          # KWQ: this propagages the ghcver selection, but not the others (e.g. llvmver)
-                          let s1 = builtins.trace "ghcverInp in ${ghcver} for ${n}" drvArgs.${n};
-                              outloc = x: if hasAttr "outputs" x
-                                          then (if (builtins.isAttrs x.outputs)
-                                               then let r = x.outputs.packages.${system}.${n}.${ghcver}; in builtins.trace "outputs" (builtins.trace (builtins.attrNames x.outputs) r)
-                                                else (builtins.trace "gg" x))
-                                          else (builtins.trace "hh" x);
-                              defloc = x: x.default or x;
-                          in outloc (defloc (outloc s1));
-                          # if hasAttr "outputs" (builtins.trace "drvArgs.${n}" (builtins.trace (builtins.attrNames drvArgs.${n}) drvArgs.${n}))
-                          # then let b = drvArgs.${n}.outputs.packages.${system}.${n}.${ghcver};
-                          #      in (builtins.trace "bdef" b.default) or (builtins.trace "no-bdef" b)
-                          # else builtins.trace "ee" drvArgs.${n};
-                        argNames = attrNames drvArgs;
-                    in listToAttrs
-                      (map (n: { name=n; value=ghcverInp n;}) argNames);
-                  args = if isFunction (builtins.trace "aa" (builtins.trace "ovrargs" ovrargs))
-                         then ovrargs (builtins.trace "bb" vargs)
-                         else (if isAttrs ovrargs
-                               then ghcverInps (builtins.trace "cc" ovrargs)
-                               else builtins.trace "dd" ovrargs);
-                  callPkg = pkgs.haskell.packages.${ghcver}.callPackage;
-                  configFlags = ovrDrvOrArgs.configFlags or [];
-                  hpkg = callPkg (fromCabal { inherit pkgs name src ghcver configFlags; }) args;
-              in adjCfg (adjDrv vargs (builtins.trace (builtins.attrNames hpkg) hpkg))
-            );
+            configFlags = ovrDrvOrArgs.configFlags or [];
+            targets = variedTargets
+              # Vary over additional user arguments plus the known GHC versions
+              (varargs // { ghcver = ghcver; })
+              # Calling this function with each argument combination:
+              ( { ghcver, ... } @ vargs:
+                with builtins;
+                let ghcverInps = drvArgs:
+                      let ghcverInp = n:
+                            # KWQ: this propagages the ghcver selection, but not the others (e.g. llvmver)
+                            let s1 = builtins.trace vargs (builtins.trace "ghcverInp in ${ghcver} for ${n}" drvArgs.${n});
+                                outloc = x: if hasAttr "outputs" x
+                                            then (if (builtins.isAttrs x.outputs)
+                                                  then x.outputs.packages.${system}.${n}.${ghcver}
+                                                  else x)
+                                            else x;
+                                defloc = x: x.default or x;
+                            in outloc (defloc (outloc s1));
+                          argNames = attrNames drvArgs;
+                      in listToAttrs
+                        (map (n: { name=n; value=ghcverInp n;}) argNames);
+                    args = if isFunction ovrargs
+                           then ovrargs vargs
+                           else (if isAttrs ovrargs
+                                 then ghcverInps ovrargs
+                                 else ovrargs);
+                    callPkg = pkgs.haskell.packages.${ghcver}.callPackage;
+                    hpkg = callPkg (fromCabal { inherit pkgs name src ghcver configFlags; }) args;
+                in adjCfg (adjDrv vargs hpkg)
+              );
+        in targets;
 
       fromCabal = { pkgs, name, src, ghcver, configFlags }:
         let cabalFlags = builtins.concatStringsSep " " configFlags;
