@@ -222,27 +222,7 @@
             # Calling this function with each argument combination:
             ( { ghcver, ... } @ vargs:
               with builtins;
-              let fromCabal = pkgs.stdenv.mkDerivation  {
-                    pname = builtins.trace ("fromCabal=${name} for ${compiler}") "${name}-cabal2nix";
-                    version = "1";
-                    src = src;
-                    buildPhase = ''
-                      mkdir $out
-                      ${pkgs.cabal2nix}/bin/cabal2nix \
-                          ${cabalFlags} \
-                           ${src} > $out/default.nix
-                    '';
-                          # --compiler ${compiler} \
-                    installPhase = ": unused";
-                  };
-                  cabalFlags = concatStringsSep " " (ovrDrvOrArgs.configFlags or []);
-                  # Convert from the nix attribute name to the name needed by cabal2nix
-                  compiler = { "ghc8101" = "ghc-8.10";
-                               "ghc884" = "ghc-8.8";
-                               "ghc865" = "ghc-8.6";
-                               "ghc844" = "ghc-8.4";
-                             }.${ghcver} or "ghc-8.8";
-                  ghcverInps = drvArgs:
+              let ghcverInps = drvArgs:
                     let ghcverInp = n:
                           # KWQ: this propagages the ghcver selection, but not the others (e.g. llvmver)
                           let s1 = builtins.trace "ghcverInp in ${ghcver} for ${n}" drvArgs.${n};
@@ -266,9 +246,31 @@
                                then ghcverInps (builtins.trace "cc" ovrargs)
                                else builtins.trace "dd" ovrargs);
                   callPkg = pkgs.haskell.packages.${ghcver}.callPackage;
-                  hpkg = callPkg fromCabal args;
+                  configFlags = ovrDrvOrArgs.configFlags or [];
+                  hpkg = callPkg (fromCabal { inherit pkgs name src ghcver configFlags; }) args;
               in adjCfg (adjDrv vargs (builtins.trace (builtins.attrNames hpkg) hpkg))
             );
+
+      fromCabal = { pkgs, name, src, ghcver, configFlags }:
+        let cabalFlags = builtins.concatStringsSep " " configFlags;
+            # Convert from the nix attribute name to the name needed by cabal2nix
+            compiler = { "ghc8101" = "ghc-8.10";
+                         "ghc884" = "ghc-8.8";
+                         "ghc865" = "ghc-8.6";
+                         "ghc844" = "ghc-8.4";
+                       }.${ghcver} or "ghc-8.8";
+        in pkgs.stdenv.mkDerivation {
+          pname = builtins.trace ("fromCabal=${name} for ${compiler}") "${name}-cabal2nix";
+          version = "1";
+          src = src;
+          buildPhase = ''
+            mkdir $out
+            ${pkgs.cabal2nix}/bin/cabal2nix ${cabalFlags} ${src} > $out/default.nix
+          '';
+          # --compiler ${compiler} \
+          installPhase = ": unused";
+        };
+
     };
 }
 
