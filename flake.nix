@@ -139,7 +139,7 @@
             aseqs = permutations aspects;
             valSeqTarget = args: keys:
               if length keys == 0
-              then func args
+              then let tgt = func args; in tgt // { default = tgt; }
               else
                 let
                   k = head keys;
