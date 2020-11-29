@@ -207,15 +207,16 @@
         , ...
         } @ hpkgargs:
         name: src: ovrDrvOrArgs:
-        let varargs = removeAttrs hpkgargs [ "nixpkgs" "system" "pkgs" ];
+        let configFlags = ovrDrvOrArgs.configFlags or [];
             # varargs is the list of variant arguments (remove the expected ones)
-            ovrargs = removeAttrs ovrDrvOrArgs [ "adjustDrv" "configFlags" ];
+            varargs = removeAttrs hpkgargs [ "nixpkgs" "system" "pkgs" ];
             # ovrargs is the list after overlay control args are removed
+            ovrargs = removeAttrs ovrDrvOrArgs [ "adjustDrv" "configFlags" ];
             #
             adjDrv = ovrDrvOrArgs.adjustDrv or (va: drv: drv);
             adjCfg = drv: pkgs.haskell.lib.appendConfigureFlags drv
               (ovrDrvOrArgs.configFlags or []);
-            configFlags = ovrDrvOrArgs.configFlags or [];
+
             targets = variedTargets
               # Vary over additional user arguments plus the known GHC versions
               (varargs // { ghcver = ghcver; })
@@ -224,22 +225,43 @@
                 with builtins;
                 let ghcverInps = drvArgs: pathArgs:
                       let ghcverInp = n:
-                            let s1 = builtins.trace vargs (builtins.trace "ghcverInp in ${ghcver} for ${n}" drvArgs.${n});
-                                outloc = x: if hasAttr "outputs" x
-                                            then (if (builtins.isAttrs x.outputs)
-                                                  then pathloc (x.outputs.packages.${system}.${n})
-                                                    (builtins.attrNames pathArgs)
-                                                  else x)
+                            let defloc = x: x.default or x;
+                                # outloc takes a dependency and finds
+                                # the right instance of that
+                                # dependency to use for this build.
+                                # If this is a raw/simple dependency,
+                                # it should just be used directly, but
+                                # if it was built with the variants
+                                # then the vargs for this build should
+                                # be used to find the right variant.
+                                # Also consider that the input may be
+                                # another derivation defined by this
+                                # flake (in which case x will have
+                                # variants directly) or it may be an
+                                # input to this flake (in which latter
+                                # case the simple or variant path is
+                                # beneath the
+                                # .outputs.packages.${system}.${n}
+                                # prefix).
+                                outloc = x: if (isAttrs x)
+                                            then let r = pathloc x names;
+                                                     names = attrNames pathArgs;
+                                                 in if isAttrs (x."outputs" or null)
+                                                    then outloc x.outputs.packages.${system}.${n}
+                                                    else r
                                             else x;
+                                # pathloc recursively walks the
+                                # remNames (names of the vargs) to see
+                                # if the same path element exists on
+                                # the input specification.
                                 pathloc = x: remNames:
                                   if remNames == [] then x
-                                  else let thisNm  = builtins.head remNames;
-                                           remNm   = builtins.tail remNames;
+                                  else let thisNm  = head remNames;
+                                           remNm   = tail remNames;
                                            thisVal = pathArgs.${thisNm};
                                            step    = x.${thisVal} or x;
                                        in pathloc step remNm;
-                                defloc = x: x.default or x;
-                            in outloc (defloc (outloc s1));
+                            in outloc (defloc (outloc (drvArgs.${n})));
                           argNames = attrNames drvArgs;
                       in listToAttrs
                         (map (n: { name=n; value=ghcverInp n;}) argNames);
@@ -249,7 +271,8 @@
                                  then ghcverInps ovrargs vargs
                                  else ovrargs);
                     callPkg = pkgs.haskell.packages.${ghcver}.callPackage;
-                    hpkg = callPkg (fromCabal { inherit pkgs name src ghcver configFlags; }) args;
+                    pkgSpec = fromCabal { inherit pkgs name src ghcver configFlags; };
+                    hpkg = callPkg pkgSpec args;
                 in adjCfg (adjDrv vargs hpkg)
               );
         in targets;
