@@ -283,16 +283,23 @@
         in targets;
 
       fromCabal = { pkgs, name, src, ghcver, configFlags }:
-        let cFlags = builtins.concatStringsSep " " (configFlags ++ ["--compiler ${compiler}"]);
-            cabalFlags = if builtins.hasAttr "dir" src
+        with builtins;
+        let cFlags = concatStringsSep " " (configFlags ++ ["--compiler ${compiler}"]);
+            cabalFlags = if hasAttr "dir" src
                          then cFlags + " --subpath ${src.dir}"
                          else cFlags;
             # Convert from the nix attribute name to the name needed by cabal2nix
-            compiler = { "ghc8101" = "ghc-8.10";
-                         "ghc884" = "ghc-8.8";
-                         "ghc865" = "ghc-8.6";
-                         "ghc844" = "ghc-8.4";
-                       }.${ghcver} or "ghc-8.8";
+            # See: nix eval '(let pkgs = import <nixpkgs> {}; in builtins.attrNames pkgs.haskell.compiler)'
+            #   "ghc8101" => "ghc-8.10"
+            #   "ghc884" => "ghc-8.8"
+            #   etc.
+            compilerVer = pkgs.haskell.compiler.${ghcver}.version or "0.0";
+            majorMinor = v:
+              let vl = splitVersion v;
+              in if length vl > 1
+                 then [(elemAt vl 0) (elemAt vl 1)]
+                 else [0 0];
+            compiler = "ghc-${concatStringsSep "." (majorMinor compilerVer)}";
         in pkgs.stdenv.mkDerivation {
           pname = "${name}-cabal2nix";
           version = "1";
