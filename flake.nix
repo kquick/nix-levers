@@ -160,6 +160,11 @@
       # ----------------------------------------------------------------------
       # Haskell Package Management
 
+      validGHCVersions = s:
+        let names = builtins.attrNames s;
+            validGHCName = n: s.${n} ? "version";
+        in builtins.filter validGHCName names;
+
       # The mkHaskellPkg is a convenience function to generate a
       # Haskell package derivation for the specified set of GHC
       # versions, given only the name, source, and overrides for that
@@ -203,7 +208,7 @@
         { nixpkgs
         , system ? "x86_64-linux"
         , pkgs ? import nixpkgs { inherit system; }
-        , ghcver ? builtins.attrNames pkgs.haskell.compiler
+        , ghcver ? validGHCVersions pkgs.haskell.compiler
         , ...
         } @ hpkgargs:
         name: src: ovrDrvOrArgs:
