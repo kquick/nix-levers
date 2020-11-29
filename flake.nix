@@ -255,7 +255,10 @@
         in targets;
 
       fromCabal = { pkgs, name, src, ghcver, configFlags }:
-        let cabalFlags = builtins.concatStringsSep " " configFlags;
+        let cFlags = builtins.concatStringsSep " " (configFlags ++ ["--compiler ${compiler}"]);
+            cabalFlags = if builtins.hasAttr "dir" src
+                         then cFlags + " --subpath ${src.dir}"
+                         else cFlags;
             # Convert from the nix attribute name to the name needed by cabal2nix
             compiler = { "ghc8101" = "ghc-8.10";
                          "ghc884" = "ghc-8.8";
@@ -270,7 +273,6 @@
             mkdir $out
             ${pkgs.cabal2nix}/bin/cabal2nix ${cabalFlags} ${src} > $out/default.nix
           '';
-          # --compiler ${compiler} \
           installPhase = ": unused";
         };
 
