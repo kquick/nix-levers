@@ -289,7 +289,7 @@
                          "ghc844" = "ghc-8.4";
                        }.${ghcver} or "ghc-8.8";
         in pkgs.stdenv.mkDerivation {
-          pname = builtins.trace ("fromCabal=${name} for ${compiler}") "${name}-cabal2nix";
+          pname = "${name}-cabal2nix";
           version = "1";
           src = src;
           buildPhase = ''
