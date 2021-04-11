@@ -1,5 +1,52 @@
 {
-  description = "Galois flake common levers and utilities";
+  # This flake is not intended to provide an application or target
+  # library---it provides nix flake support code for writing other
+  # flakes.
+  #
+  # Flakes have several restrictions:
+  #
+  #  * inputs must be simple declarative specifications and cannot be
+  #    functions or computations.
+  #
+  #  * inputs must be url references (paths or http accesses) and
+  #    cannot be other nix types (strings, integers, bools, etc.)
+  #
+  # This means that although you can override the location of various
+  # input url references, it is not possible to specify other
+  # parameters... like compiler versions, debug v.s. non-debug, etc.
+  #
+  # In order to overcome those issues, the code here provides a matrix
+  # of those elements *below* the output packages instead of as inputs.
+  #
+  # For example, if a C package could be built with gcc8, gcc9,
+  # clang9, or clang10, these parameters could be provided to the
+  # declaration code here to allow:
+  #
+  #    $ nix build .#package.gcc8
+  #    $ nix build .#package.gcc9
+  #    $ nix build .#package.clang9
+  #    $ nix build .#package.clang10
+  #
+  # If the above is now extended to two different build types: debug
+  # and optimized, this parameter can be provided as well, resulting
+  # in targets that can specify one or both parameters, in any order:
+  #
+  #    $ nix build .#package.gcc8.default
+  #    $ nix build .#package.gcc8.debug
+  #    $ nix build .#package.debug.gcc8
+  #    $ nix build .#package.clang10.opt
+  #
+  # Note that at any point the "default" keyword can be used to
+  # specify that for all remaining parameters not explicitly
+  # specified, the default value should be used.  The "default"
+  # keyword must be the _last_ component specified.
+  #
+  # This flake also provides support for creating packages for various languages.
+  #
+  #   mkHaskellPkg - creates a cabal2nix-derived haskell package build specification.
+  #
+
+  description = "Generates parameterized flake configurations for language packages";
 
   inputs.nixpkgs.url = flake:nixpkgs;
 
