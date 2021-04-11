@@ -306,6 +306,7 @@
           src = src;
           buildPhase = ''
             mkdir $out
+            echo ${pkgs.cabal2nix}/bin/cabal2nix ${cabalFlags} ${src} ">" $out/default.nix
             ${pkgs.cabal2nix}/bin/cabal2nix ${cabalFlags} ${src} > $out/default.nix
           '';
           installPhase = ": unused";
