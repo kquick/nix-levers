@@ -332,9 +332,11 @@
       fromCabal = { pkgs, name, src, ghcver, configFlags }:
         with builtins;
         let cFlags = concatStringsSep " " (configFlags ++ ["--compiler ${compiler}"]);
-            cabalFlags = if hasAttr "dir" src
-                         then cFlags + " --subpath ${src.dir}"
-                         else cFlags;
+            cabalFlags = if isString src
+                         then cFlags
+                         else if hasAttr "dir" src
+                              then cFlags + " --subpath ${src.dir}"
+                              else cFlags;
             # Convert from the nix attribute name to the name needed by cabal2nix
             # See: nix eval '(let pkgs = import <nixpkgs> {}; in builtins.attrNames pkgs.haskell.compiler)'
             #   "ghc8101" => "ghc-8.10"
