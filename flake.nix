@@ -381,8 +381,12 @@
           pname = "${name}-cabal2nix";
           version = "1";
           src = src;
+          # n.b. the LANG specification avoids commitBuffer errors
+          # from cabal2nix when UTF characters are encountered
+          # (viz. path-io).
           buildPhase = ''
             mkdir $out
+            export LANG=C.UTF-8
             echo ${pkgs.cabal2nix}/bin/cabal2nix ${cabalFlags} ${src} ">" $out/default.nix
             ${pkgs.cabal2nix}/bin/cabal2nix ${cabalFlags} ${src} > $out/default.nix
           '';
