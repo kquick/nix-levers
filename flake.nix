@@ -340,6 +340,11 @@
       #  * "configFlags" value is a list of flags that is provided to
       #    both the cabal2nix and applied to the package derivation.
       #
+      # The return is a derivation for the default configuration (to
+      # satisfy other flake expectations like `nix flake check`), but
+      # it also contains attributes for each variant value that return
+      # a tree of derivations for the corresponding variant values.
+      #
       mkHaskellPkg =
         { nixpkgs
         , system ? "x86_64-linux"
@@ -376,7 +381,7 @@
                     hpkg = callPkg pkgSpec args;
                 in adjCfg (adjDrv vargs hpkg)
               );
-        in targets;
+        in targets.default // targets;
 
       fromCabal = { pkgs, name, src, ghcver, configFlags }:
         with builtins;
