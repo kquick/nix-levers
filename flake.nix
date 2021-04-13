@@ -274,11 +274,32 @@
       # ----------------------------------------------------------------------
       # Haskell Package Management
 
-      validGHCVersions = s:
+      # Returns a list of the valid GHC compiler attribute names for
+      # the compiler set passed, in sorted order of most recently
+      # *released* first.
+      #
+      # Example return:
+      # [ "ghc8102", "ghc8101", "ghc883", # "ghc883Binary", "ghcHead", "ghcjs" ]
+      #
+      validGHCVersions =
+        s:  # should be pkgs.haskell.compiler attrset for the current pkgs
         let names = builtins.attrNames s;
             validGHCName = n: s.${n} ? "version";
             validVersions = builtins.filter validGHCName names;
-        in validVersions;
+            # comparingReleases = a: b: a < b;
+            comparingReleases = a: b:
+              # a and b are: ghcjs, ghcHead, ghc883, ghc8101, ghc8102,
+              # ghcjs86, ...  want to sort this with the highest
+              # version down to the lowest so that the highest version
+              # (the default) is the first in the list.
+              let av = getVer a;
+                  bv = getVer b;
+                  getVer = x: let y = builtins.splitVersion x ++ [ "[none]" "[empty]" ];
+                              in builtins.elemAt y 1 + "--" + builtins.elemAt y 2;
+              in builtins.compareVersions av bv > 0;
+            sortedVersions = builtins.sort comparingReleases validVersions;
+            ghcVersions = sortedVersions;
+        in ghcVersions;
 
       # The mkHaskellPkg is a convenience function to generate a
       # Haskell package derivation for the specified set of GHC
