@@ -376,7 +376,9 @@
                            else (if isAttrs ovrargs
                                  then variedInputs system ovrargs vargs
                                  else ovrargs);
-                    callPkg = pkgs.haskell.packages.${ghcver}.callPackage;
+                    callPkg = if pkgs.haskell.packages ? "${ghcver}"
+                              then pkgs.haskell.packages.${ghcver}.callPackage
+                              else abort "Requested ${ghcver} not available in: ${builtins.toString (builtins.attrNames pkgs.haskell.packages)}";
                     pkgSpec = fromCabal { inherit pkgs name src ghcver configFlags; };
                     hpkg = callPkg pkgSpec args;
                 in adjCfg (adjDrv vargs hpkg)
