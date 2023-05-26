@@ -57,6 +57,7 @@
         # "i686-linux"
         # "aarch64-linux"
         "x86_64-darwin"
+        "aarch64-darwin"
       ];
 
       eachSystem = nixpkgs.lib.genAttrs supportedSystems;
