@@ -272,6 +272,24 @@
             };
         in builtins.listToAttrs (builtins.map verInpAttr argNames);
 
+      # Wraps a number of packages.  This is commonly used as a high-level test
+      # or check target.  It does not have any real substance or build process
+      # itself, but it requires the provided list of dependency targets to have
+      # been built successfully before it can succeed.
+      pkg_wrapper =
+        system:
+        pkgs:
+        name:
+        pkglist:
+        builtins.derivation
+          {
+            inherit name system;
+            builder = "${pkgs.bash}/bin/bash";
+            args = [ "-c" "echo OK > $out" ];
+            buildInputs = pkglist;
+          };
+
+
       # ----------------------------------------------------------------------
       # Haskell Package Management
 
