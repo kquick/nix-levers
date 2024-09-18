@@ -48,7 +48,7 @@
 
   description = "Generates parameterized flake configurations for language packages";
 
-  inputs.nixpkgs.url = flake:nixpkgs;
+  inputs.nixpkgs.url = github:nixos/nixpkgs;
 
   outputs = { self, nixpkgs }: rec
     {
@@ -320,6 +320,31 @@
             ghcVersions = sortedVersions;
         in ghcVersions;
 
+      # Given a list of nixpkgs instances, this will determine all the GHC
+      # versions supported across those instances.  The input nixpkgs list
+      # is a list of items that can be imported:
+      #
+      #    import X { inherit system; }
+      #
+      # returns [{ this_nixpkgs: nixpkgs, ghcvers: [ "ghcv1" "ghcv2" .. ]}
+      # for all ghcver found across all nixpkgs in nixpkgs_lst.
+      #
+      all_ghcver_and_nixpkgs =
+        system:
+        nixpkgs_lst: # [ X Y ] --> import X { inherit system; }
+        let get_ghcvers_for_nixpkgs_ref = cur_nixpkgs:
+              let pkgs = import cur_nixpkgs { inherit system; };
+              in validGHCVersions pkgs.haskell.compiler;
+            build_ghcvers_for_nixpkgs = accum: this_nixpkgs:
+              let ghcvers = builtins.filter notSeenYet
+                            (get_ghcvers_for_nixpkgs_ref this_nixpkgs);
+                  notSeenYet = v:
+                    ! (builtins.elem v
+                      (builtins.concatLists
+                        (builtins.map (a: builtins.getAttr "ghcvers" a) accum)));
+              in accum ++ [ { inherit this_nixpkgs ghcvers;} ];
+        in builtins.foldl' build_ghcvers_for_nixpkgs [] nixpkgs_lst;
+
       # The mkHaskellPkg is a convenience function to generate a
       # Haskell package derivation for the specified set of GHC
       # versions, given only the name, source, and overrides for that
@@ -403,6 +428,27 @@
                 in adjCfg (adjDrv vargs hpkg)
               );
         in targets.default // targets;
+
+      # This function is a wrapper for mkHaskellPkg that additionally takes a
+      # list of nixpkgs entries.  It will create a haskell package declaration
+      # for all GHC versions that exist across all the provided nixpkgs entries.
+      mkHaskellPkgs =
+        { system ? "x86_64-linux"
+        , ...
+        } @ hpkgargs:
+        nixpkgs_list: name: src: ovrDrvOrArgs:
+        let nixghcs = all_ghcver_and_nixpkgs system nixpkgs_list;
+            addpkgsfornixghc = accum:
+              { this_nixpkgs, ghcvers }:
+              let thisHaskellPkgs =
+                    let args = hpkgargs // {
+                          nixpkgs = this_nixpkgs;
+                          ghcver = ghcvers;
+                        };
+                    in mkHaskellPkg args name src ovrDrvOrArgs;
+              in thisHaskellPkgs // accum;
+              # in accum // thisHaskellPkgs;
+        in builtins.foldl' addpkgsfornixghc {} nixghcs;
 
       fromCabal = { pkgs, name, src, ghcver, configFlags }:
         with builtins;
