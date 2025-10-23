@@ -333,7 +333,16 @@
         system:
         nixpkgs_lst: # [ X Y ] --> import X { inherit system; }
         let get_ghcvers_for_nixpkgs_ref = cur_nixpkgs:
-              let pkgs = import cur_nixpkgs { inherit system; };
+              let pkgs = import cur_nixpkgs { inherit system;
+                                              config = {
+                                                # Aliases are disabled because
+                                                # top-level/haskell-packages will
+                                                # set attributes like ghc96 to
+                                                # `throw "removed"` which are
+                                                # fatal to even touch.
+                                                allowAliases = false;
+                                              };
+                                            };
               in validGHCVersions pkgs.haskell.compiler;
             build_ghcvers_for_nixpkgs = accum: this_nixpkgs:
               let ghcvers = builtins.filter notSeenYet
@@ -392,7 +401,14 @@
       mkHaskellPkg =
         { nixpkgs
         , system ? "x86_64-linux"
-        , pkgs ? import nixpkgs { inherit system; }
+        , pkgs ? import nixpkgs { inherit system;
+                                  config = {
+                                    # Aliases are disabled because
+                                    # top-level/haskell-packages will set
+                                    # attributes like ghc96 to `throw "removed"`
+                                    # which are fatal to even touch.
+                                    allowAliases = false;
+                                  }; }
         , ghcver ? validGHCVersions pkgs.haskell.compiler
         , ...
         } @ hpkgargs:
