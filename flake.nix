@@ -290,6 +290,45 @@
           };
 
 
+      # Many packages have multiple versions available, usually as identified by
+      # their major version via an attribute like "pkgname_majorver"
+      # (e.g. llvm_19, ghc92, etc.).  Over time, different nixpkgs versions will
+      # have a set of package versions available.
+      #
+      # This function will find a nixpkgs version (from a supplied list) which
+      # provides the named package at the requested version.
+      #  * The nixpkgs_list should contain entries that are importable with a
+      #    system attribute and should be in the preferred resolution order.
+      #  * The pkgname should contain any separator needed (e.g. "llvm_", "ghc").
+      #  * The pkgver is a string.
+      get_pkg_at_ver = system: nixpkgs_list: pkgname: pkgver:
+        let lkup = nl:
+              if nl == []
+              then throw ''
+                   Could not find a nixpkgs version supporting ${pkgname} version ${pkgver}.
+
+                   If this is a newer version of the package, try `nix flake
+                   update nixpkgs` and then re-try the current nix operation (to
+                   get the most recent versions of the supplied nixpkgs list
+                   entries.
+
+                   If this is an older version of the package, you may need to
+                   add an older nixpkgs reference to the inputs and then to the
+                   end of the provided nixpkgs list.
+                   ''
+              else
+                let np = import (builtins.head nl) { inherit system; }; in
+                if builtins.hasAttr "${pkgname}_${pkgver}" np
+                then
+                  # Use tryEval because removed packages have a throw
+                  let r = builtins.tryEval (np."${pkgname}_${pkgver}");
+                  in if r.success == true
+                     then r.value
+                     else lkup (builtins.tail nl)
+                else lkup (builtins.tail nl);
+        in lkup nixpkgs_list;
+
+
       # ----------------------------------------------------------------------
       # Haskell Package Management
 
