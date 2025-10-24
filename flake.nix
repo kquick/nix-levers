@@ -196,13 +196,20 @@
                   recurse = v: valSeqTarget (args_ v) keys_;
                   l = map (v: { name = v; value = recurse v; }) listAttrs.${k};
                   primary = listToAttrs l;
+
                   def = foldl' op primary keys;
-                  op = curset: k:
-                    getAttr (head listAttrs.${k}) curset;
-                in primary // { default = def; };
-            defaultPath = listAttrs: keys:
-              concatStringsSep "."
-                (map (k: head (listAttrs.${k})) keys);
+                  op = curset: k:  getAttr (head listAttrs.${k}) curset;
+                  addDefault = s:
+                    if length l > 0 # k has at least one target
+                    then s // { default = def; }
+                    else
+                      # This function is responsible for creating a build for
+                      # each variant, and sets "default" to the first variant.
+                      # However, if a variant has *no* valid entries, no builds
+                      # whatsoever can be created, which is probably *not* what
+                      # the user wanted.
+                      throw "An empty list was provided for the ${k} variant";
+                in addDefault primary;
         in foldl' (r: a: mergeAttrSets r (valSeqTarget {} a)) {} aseqs;
 
       # When variedTargets is used to generate a matrix of possible
@@ -501,7 +508,13 @@
                           ghcver = ghcvers;
                         };
                     in mkHaskellPkg args name src ovrDrvOrArgs;
-              in thisHaskellPkgs // accum;
+              in if builtins.length ghcvers == 0
+                 then
+                   # no unique GHC versions obtained from this nixpkgs version
+                   # (every GHC version in this nixpkgs was already provided by a
+                   # previous nixpkgs).
+                   accum
+                 else thisHaskellPkgs // accum;
               # in accum // thisHaskellPkgs;
         in builtins.foldl' addpkgsfornixghc {} nixghcs;
 
