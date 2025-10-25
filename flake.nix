@@ -349,7 +349,8 @@
       validGHCVersions =
         s:  # should be pkgs.haskell.compiler attrset for the current pkgs
         let names = builtins.attrNames s;
-            validGHCName = n: s.${n} ? "version";
+            validGHCName = n: let r = builtins.tryEval (s.${n} ? "version");
+                              in if r.success then r.value else false;
             validVersions = builtins.filter validGHCName names;
             # comparingReleases = a: b: a < b;
             comparingReleases = a: b:
