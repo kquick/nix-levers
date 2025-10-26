@@ -454,7 +454,7 @@
                                     # top-level/haskell-packages will set
                                     # attributes like ghc96 to `throw "removed"`
                                     # which are fatal to even touch.
-                                    allowAliases = false;
+                                    allowAliases = true;
                                   }; }
         , ghcver ? validGHCVersions pkgs.haskell.compiler
         , ...
