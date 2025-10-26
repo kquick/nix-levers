@@ -555,6 +555,55 @@
           installPhase = ": unused";
         };
 
+      # Creates a dev shell (e.g. for `nix develop`) for the haskell packages
+      # specified in the input flake (usually "self" for the caller).
+      #
+      # If defaultPkg is provided, the default shell will be for that
+      # package. Ohterwise, no default is set.
+      #
+      # additionalPackages is an optional function that is passed the target
+      # package set and returns a list of additional packages for the
+      # environment.  The default is cabal-install.
+      #
+      # env_vars is an optional attribute set of environment variables and their
+      # values that should be set in the target environment.  This can be useful
+      # to propagate nix-generated paths.
+      #
+      # excludedPackages is an optional list of package attribute names to be
+      # excluded (i.e. no shell will be generated).
+      #
+      haskellShells = { nixpkgs
+                      , flake
+                      , defaultPkg ? null
+                      , additionalPackages ? (pkgs: [ pkgs.cabal-install ])
+                      , env_vars ? {}
+                      , excludedPackages ? []
+                      }:
+        let oneshell = s: n:
+              let pkgs = import nixpkgs { system=s; };
+                  shellWith = drv:
+                    drv.overrideAttrs(old:
+                      { buildInputs = old.buildInputs
+                                      ++ additionalPackages pkgs;
+                      } // env_vars);
+              in variedTargets
+                # TODO: needs more work: only successfully generating shell
+                # versions of primary targets.
+                { ghcver = validGHCVersions pkgs.haskell.compiler; }
+                ( { ghcver, ... } @ vargs:
+                    shellWith (flake.packages.${s}.${n}.${ghcver}.env));
+        in eachSystem
+          (s:
+            let pkgs = import nixpkgs { system=s; };
+                names = builtins.attrNames (flake.packages.${s});
+                outs = builtins.removeAttrs (pkgs.lib.genAttrs names (oneshell s))
+                  excludedPackages;
+                shells = pkgs.lib.attrsets.mapAttrs (n: v: v.default) outs;
+            in if defaultPkg == null
+               then shells
+               else shells // { default = shells.${defaultPkg}; }
+          );
+
     };
 }
 
