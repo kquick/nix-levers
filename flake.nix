@@ -572,12 +572,18 @@
       # excludedPackages is an optional list of package attribute names to be
       # excluded (i.e. no shell will be generated).
       #
+      # ghcvers is an optional argument that can be specified as a function which
+      # takes the current system and returns a list of the compiler names to use.
+      # The default if not supplied is the output of the validGHCVersions
+      # function.
+      #
       haskellShells = { nixpkgs
                       , flake
                       , defaultPkg ? null
                       , additionalPackages ? (pkgs: [ pkgs.cabal-install ])
                       , env_vars ? {}
                       , excludedPackages ? []
+                      , ghcvers ? null
                       }:
         let oneshell = s: n:
               let pkgs = import nixpkgs { system=s; };
@@ -589,7 +595,9 @@
               in variedTargets
                 # TODO: needs more work: only successfully generating shell
                 # versions of primary targets.
-                { ghcver = validGHCVersions pkgs.haskell.compiler; }
+                { ghcver = if ghcvers == null
+                           then validGHCVersions pkgs.haskell.compiler
+                           else ghcvers s; }
                 ( { ghcver, ... } @ vargs:
                     shellWith (flake.packages.${s}.${n}.${ghcver}.env));
         in eachSystem
