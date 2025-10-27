@@ -325,10 +325,10 @@
                    ''
               else
                 let np = import (builtins.head nl) { inherit system; }; in
-                if builtins.hasAttr "${pkgname}_${pkgver}" np
+                if builtins.hasAttr "${pkgname}${pkgver}" np
                 then
                   # Use tryEval because removed packages have a throw
-                  let r = builtins.tryEval (np."${pkgname}_${pkgver}");
+                  let r = builtins.tryEval (np."${pkgname}${pkgver}");
                   in if r.success == true
                      then r.value
                      else lkup (builtins.tail nl)
