@@ -539,10 +539,16 @@
                  then [(elemAt vl 0) (elemAt vl 1)]
                  else [0 0];
             compiler = "ghc-${concatStringsSep "." (majorMinor compilerVer)}";
+            justCabalFiles = name: type:
+              name == "cabal.project"
+              || name == "cabal.project.freeze"
+              || (let nl = builtins.stringLength name;
+                  in nl > 6
+                     && (builtins.substring (nl - 6) 6 name) == ".cabal");
         in pkgs.stdenv.mkDerivation {
           pname = "${name}-cabal2nix";
           version = "1";
-          src = src;
+          src = builtins.filterSource justCabalFiles src;
           # n.b. the LANG specification avoids commitBuffer errors
           # from cabal2nix when UTF characters are encountered
           # (viz. path-io).
