@@ -297,22 +297,16 @@
           };
 
 
-      # Many packages have multiple versions available, usually as identified by
-      # their major version via an attribute like "pkgname_majorver"
-      # (e.g. llvm_19, ghc92, etc.).  Over time, different nixpkgs versions will
-      # have a set of package versions available.
-      #
-      # This function will find a nixpkgs version (from a supplied list) which
-      # provides the named package at the requested version.
-      #  * The nixpkgs_list should contain entries that are importable with a
-      #    system attribute and should be in the preferred resolution order.
-      #  * The pkgname should contain any separator needed (e.g. "llvm_", "ghc").
-      #  * The pkgver is a string.
-      get_pkg_at_ver = system: nixpkgs_list: pkgname: pkgver:
+      # Given a list of nixpkgs in desired order, find the nixpkgs that contains
+      # a valid, non-throwing target attribute and return the containing nixpkgs.
+      get_nixpkgs_with_valid = system:
+        nixpkgs_list: # importable entries with a system attribute in the
+                      # preferred resolution order.
+        tgtattrname:  # name of desired target attribute
         let lkup = nl:
               if nl == []
               then throw ''
-                   Could not find a nixpkgs version supporting ${pkgname} version ${pkgver}.
+                   Could not find a nixpkgs version supplying the desired ${tgtattrname} target.
 
                    If this is a newer version of the package, try `nix flake
                    update nixpkgs` and then re-try the current nix operation (to
@@ -325,16 +319,30 @@
                    ''
               else
                 let np = import (builtins.head nl) { inherit system; }; in
-                if builtins.hasAttr "${pkgname}${pkgver}" np
+                if builtins.hasAttr "${tgtattrname}" np
                 then
                   # Use tryEval because removed packages have a throw
-                  let r = builtins.tryEval (np."${pkgname}${pkgver}");
+                  let r = builtins.tryEval (np."${tgtattrname}");
                   in if r.success == true
-                     then r.value
+                     then np
                      else lkup (builtins.tail nl)
                 else lkup (builtins.tail nl);
         in lkup nixpkgs_list;
 
+      # Many packages have multiple versions available, usually as identified by
+      # their major version via an attribute like "pkgname_majorver"
+      # (e.g. llvm_19, ghc92, etc.).  Over time, different nixpkgs versions will
+      # have a set of package versions available.
+      #
+      # This function will find a nixpkgs version (from a supplied list) which
+      # provides the named package at the requested version.
+      #  * The nixpkgs_list should contain entries that are importable with a
+      #    system attribute and should be in the preferred resolution order.
+      #  * The pkgname should contain any separator needed (e.g. "llvm_", "ghc").
+      #  * The pkgver is a string.
+      get_pkg_at_ver = system: nixpkgs_list: pkgname: pkgver:
+        let aname = "${pkgname}${pkgver}";
+        in builtins.getAttr (get_nixpkgs_with_valid system nixpkgs_list aname) aname;
 
       # ----------------------------------------------------------------------
       # Haskell Package Management
