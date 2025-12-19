@@ -173,7 +173,7 @@
       # The result of the above allows specification of the
       # discriminated portions of the path (in any attr order), and
       # the use of "default" to get the default values for any
-      # portions that are not discrminated.
+      # portions that are not discriminated.
       #
       # This function is particularly useful for a flake-specified
       # derivation that has multiple parameters.  The "func" is the
