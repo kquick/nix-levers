@@ -573,7 +573,7 @@
       # specified in the input flake (usually "self" for the caller).
       #
       # If defaultPkg is provided, the default shell will be for that
-      # package. Ohterwise, no default is set.
+      # package. Otherwise, no default is set.
       #
       # additionalPackages is an optional function that is passed the target
       # package set and returns a list of additional packages for the
@@ -591,6 +591,9 @@
       # The default if not supplied is the output of the validGHCVersions
       # function.
       #
+      # adjustShell is passed the system, the nixpkgs, and the shell derivation
+      # and may make any additional adjustments, returning the updated shell
+      # derivation.
       haskellShells = { nixpkgs
                       , flake
                       , defaultPkg ? null
@@ -598,14 +601,16 @@
                       , env_vars ? {}
                       , excludedPackages ? []
                       , ghcvers ? null
+                      , adjustShell ? (s: d: d)
                       }:
         let oneshell = s: n:
               let pkgs = import nixpkgs { system=s; };
                   shellWith = drv:
-                    drv.overrideAttrs(old:
-                      { buildInputs = old.buildInputs
-                                      ++ additionalPackages pkgs;
-                      } // env_vars);
+                    adjustShell s nixpkgs
+                      (drv.overrideAttrs(old:
+                        { buildInputs = old.buildInputs
+                                        ++ additionalPackages pkgs;
+                        } // env_vars));
               in variedTargets
                 # TODO: needs more work: only successfully generating shell
                 # versions of primary targets.
