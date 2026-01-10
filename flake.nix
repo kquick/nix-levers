@@ -601,7 +601,7 @@
                       , env_vars ? {}
                       , excludedPackages ? []
                       , ghcvers ? null
-                      , adjustShell ? (s: d: d)
+                      , adjustShell ? (s: p: d: d)
                       }:
         let oneshell = s: n:
               let pkgs = import nixpkgs { system=s; };
