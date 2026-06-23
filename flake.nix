@@ -631,6 +631,26 @@
                else shells // { default = shells.${defaultPkg}; }
           );
 
+      # Specify jailbreaking (removing version constraints) for this list of
+      # Haskell libraries.  Useful when a library has not yet been updated for a
+      # new version of GHC.  Use with care.
+      haskellUnbounded =
+        pkgs:     # current nixpkgs
+        ghcvers:  # list of GHC versions this applies to
+        pkgNames: # list of package names to be unbound
+        args:     # args from adjustDrv (to find ghcver)
+        drv:      # derivation whose dependencies should be unbound
+        let getOutOfJail_check = p:
+              if builtins.elem args.ghcver ghcvers
+                 && p != null
+                 && builtins.elem (p.pname or "no-pname") pkgNames
+              then pkgs.haskell.lib.doJailbreak p else p;
+        in drv.overrideAttrs
+          (old:
+            {
+              buildInputs = builtins.map getOutOfJail_check
+                (old.buildInputs or []);
+            });
     };
 }
 
