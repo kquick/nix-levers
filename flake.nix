@@ -650,6 +650,8 @@
             {
               buildInputs = builtins.map getOutOfJail_check
                 (old.buildInputs or []);
+              propagatedBuildInputs = builtins.map getOutOfJail_check
+                (old.propagatedBuildInputs or []);
             });
     };
 }
