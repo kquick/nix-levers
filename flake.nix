@@ -342,7 +342,7 @@
       #  * The pkgver is a string.
       get_pkg_at_ver = system: nixpkgs_list: pkgname: pkgver:
         let aname = "${pkgname}${pkgver}";
-        in builtins.getAttr (get_nixpkgs_with_valid system nixpkgs_list aname) aname;
+        in builtins.getAttr aname (get_nixpkgs_with_valid system nixpkgs_list aname);
 
       # ----------------------------------------------------------------------
       # Haskell Package Management
