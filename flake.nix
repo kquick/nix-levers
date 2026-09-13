@@ -494,9 +494,17 @@
                     callPkg = if pkgs.haskell.packages ? "${ghcver}"
                               then pkgs.haskell.packages.${ghcver}.callPackage
                               else abort "Requested ${ghcver} not available in: ${builtins.toString (builtins.attrNames pkgs.haskell.packages)}";
-                    pkgSpec = fromCabal { inherit pkgs name src ghcver configFlags; };
+                    pkgSpec =
+                      if pathExists "${src}/nix/${name}-${ghcver}.nix"
+                      then "${src}/nix/${name}-${ghcver}.nix"
+                      else if pathExists "${src}/nix/${name}.nix"
+                           then "${src}/nix/${name}.nix"
+                           else fromCabal { inherit pkgs name src ghcver
+                                            configFlags; };
                     hpkg = callPkg pkgSpec args;
-                in adjCfg (adjDrv vargs hpkg)
+                in (adjCfg (adjDrv vargs hpkg)).overrideAttrs (o: {
+                  src = src;
+                })
               );
         in targets.default // targets;
 
