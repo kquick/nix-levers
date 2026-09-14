@@ -507,18 +507,15 @@
                               then pkgs.haskell.packages.${ghcver}.callPackage
                               else abort "Requested ${ghcver} not available in: ${builtins.toString (builtins.attrNames pkgs.haskell.packages)}";
                     pkgSpec =
-                      let genCabal = builtins.trace ("No deriv for ${name}")
-                        (fromCabal {
-                          inherit pkgs name src ghcver
-                            configFlags; });
-                          dsrc =
-                            builtins.trace (hpkgargs.nix-deriv-srcs or "nope")
-                              (hpkgargs.nix-deriv-srcs or "${src}/nix");
+                      let genCabal = fromCabal {
+                            inherit pkgs name src ghcver configFlags;
+                          };
+                          dsrc = hpkgargs.nix-deriv-srcs or "${src}/nix";
                       in
                         if pathExists "${dsrc}/${name}-${ghcver}.nix"
                         then "${dsrc}/${name}-${ghcver}.nix"
                         else (if pathExists "${dsrc}/${name}.nix"
-                              then (builtins.trace "USING ${dsrc}/${name}.nix!!!" "${dsrc}/${name}.nix")
+                              then "${dsrc}/${name}.nix"
                               else genCabal);
                     hpkg = callPkg pkgSpec args;
                 in adjDrv vargs hpkg
