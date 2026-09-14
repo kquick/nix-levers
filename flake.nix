@@ -420,6 +420,16 @@
       # Haskell packages and generate a derivation for each possible
       # GHC compiler version.
       #
+      # The main attribute set can specify:
+      #
+      #  * "nix-deriv-srcs" to specify a location (usually a subdirectory
+      #    of the *current* package) where static derivations can be
+      #    found for any of the dependency packages or this package.
+      #    These are usually generated via cabal2nix, and if this attribute
+      #    isn't specified, or a "packagename.nix" file isn't found for
+      #    any package that mkHaskellPkg is called for, then cabal2nix
+      #    will be run at derivation time for that package.
+      #
       # The ovrDrvOrArgs can be used to override any arguments to the
       # derivation in a specific fashion.  This argument can be any
       # of:
@@ -470,7 +480,9 @@
         name: src: ovrDrvOrArgs:
         let configFlags = ovrDrvOrArgs.configFlags or [];
             # varargs is the list of variant arguments (remove the expected ones)
-            varargs = removeAttrs hpkgargs [ "nixpkgs" "system" "pkgs" ];
+            varargs = removeAttrs hpkgargs [ "nixpkgs" "system" "pkgs"
+                                             "nix-deriv-srcs"
+                                           ];
             # ovrargs is the list after overlay control args are
             # removed.  This should end up being just the dependencies
             # that are being overridden.
@@ -495,16 +507,21 @@
                               then pkgs.haskell.packages.${ghcver}.callPackage
                               else abort "Requested ${ghcver} not available in: ${builtins.toString (builtins.attrNames pkgs.haskell.packages)}";
                     pkgSpec =
-                      if pathExists "${src}/nix/${name}-${ghcver}.nix"
-                      then "${src}/nix/${name}-${ghcver}.nix"
-                      else if pathExists "${src}/nix/${name}.nix"
-                           then "${src}/nix/${name}.nix"
-                           else fromCabal { inherit pkgs name src ghcver
-                                            configFlags; };
+                      let genCabal = builtins.trace ("No deriv for ${name}")
+                        (fromCabal {
+                          inherit pkgs name src ghcver
+                            configFlags; });
+                          dsrc =
+                            builtins.trace (hpkgargs.nix-deriv-srcs or "nope")
+                              (hpkgargs.nix-deriv-srcs or "${src}/nix");
+                      in
+                        if pathExists "${dsrc}/${name}-${ghcver}.nix"
+                        then "${dsrc}/${name}-${ghcver}.nix"
+                        else (if pathExists "${dsrc}/${name}.nix"
+                              then (builtins.trace "USING ${dsrc}/${name}.nix!!!" "${dsrc}/${name}.nix")
+                              else genCabal);
                     hpkg = callPkg pkgSpec args;
-                in (adjCfg (adjDrv vargs hpkg)).overrideAttrs (o: {
-                  src = src;
-                })
+                in adjDrv vargs hpkg
               );
         in targets.default // targets;
 
