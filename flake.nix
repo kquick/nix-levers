@@ -340,9 +340,19 @@
       #    system attribute and should be in the preferred resolution order.
       #  * The pkgname should contain any separator needed (e.g. "llvm_", "ghc").
       #  * The pkgver is a string.
+      get_version_of_pkg = system: nixpkgs_list: versionedName:
+        builtins.getAttr versionedName
+          (get_nixpkgs_with_valid system nixpkgs_list versionedName);
+
+      # An older version of get_version_of_pkg that performed simple string
+      # concatenation to determine the name.  Obsolete: please use
+      # get_version_of_pkg instead.
       get_pkg_at_ver = system: nixpkgs_list: pkgname: pkgver:
         let aname = "${pkgname}${pkgver}";
-        in builtins.getAttr aname (get_nixpkgs_with_valid system nixpkgs_list aname);
+        in builtins.trace
+          "Obsolete: use get_version_of_pkg instead of get_pkg_at_ver please"
+          (builtins.getAttr aname
+            (get_nixpkgs_with_valid system nixpkgs_list aname));
 
       # ----------------------------------------------------------------------
       # Haskell Package Management
