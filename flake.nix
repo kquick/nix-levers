@@ -52,6 +52,30 @@
 
   outputs = { self, nixpkgs }: rec
     {
+      apps = self.eachSystem (s:
+        {
+          depmgr = {
+            type = "app";
+            program = "${self.packages.${s}.depmgr}/depmgr.sh";
+          };
+        });
+
+      packages = self.eachSystem (s:
+        let pkgs = import nixpkgs { system = s; };
+        in rec {
+          default = depmgr;
+          depmgr = pkgs.stdenv.mkDerivation {
+            name = "levers-depmgr";
+            version = "1";
+            src = self;
+            installPhase = ''
+              mkdir $out
+              cp depmgr.sh $out/
+              chmod a+x $out/depmgr.sh
+              '';
+            };
+        });
+
       supportedSystems = [
         "x86_64-linux"
         # "i686-linux"

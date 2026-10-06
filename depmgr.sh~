@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+show_usage() {
+    ( echo "Usage: $(basename $0) CMD CMD-ARGS..."
+      echo ""
+      echo "Known CMD operations:"
+      echo ""
+      echo "  flake_update [organization]"
+      echo "      - Updates the flake dependencies to the latest version available"
+      echo "        at the flake input (usually a github/gitlab repository).  The"
+      echo "        'organization' specification can be used to filter the"
+      echo "        set of dependencies to only those provided by the specified"
+      echo "        forge organization (e.g. Galois, taphos, etc.)."
+      echo ""
+    ) 1>&2
+}
+
+run () {
+    pkg=$1
+    shift 1
+    nix run nixpkgs#${pkg} -- "$@"
+}
+
+mkDeriv () {
+    echo :::: Github $1 / $2 derivation generation;
+    run cabal2nix https://github.com/${1}/${2} \
+        --revision=$(nix flake metadata --json |
+                         run jq -r --arg SRC "${2}-src" '.locks.nodes.[$SRC].locked.rev') \
+        > ${2}.nix;
+}
+
+do_flake_update () {
+    if [ -z "$1" ] ;
+    then echo nix flake update --option tarball-ttl 60
+    else
+        deps=$(nix flake metadata --json |
+                   run jq -r ".locks.nodes | to_entries[] | select((.value.locked.type == \"github\" or .value.locked.type == \"gitlab\") and (.value.locked.owner | ascii_downcase) == \"$1\") | .value.locked.repo")
+        if [ -z "$deps" ] ;
+        then echo "No dependencies to update for the $1 organization."
+        else echo nix flake update --option tarball-ttl 60 $deps
+        fi
+    fi
+    return 0
+}
+
+case $1 in
+    flake_update) do_flake_update "${2}";;
+    help) show_usage;;
+    *) echo "UNRECOGNIZED command: '${1}'" 1>&2;
+       echo "Use '$(basename $0) help' to get help" 1>&2;
+       exit 1;;
+esac
+
+exit 0
