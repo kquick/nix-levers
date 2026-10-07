@@ -1,0 +1,98 @@
+*.py[cod]
+
+# C extensions
+*.so
+
+# LLVM build artifacts
+test/examples/**/*.bc
+*.ll
+
+# Packages
+*.egg
+*.egg-info
+dist
+build
+eggs
+parts
+bin
+var
+sdist
+develop-eggs
+.installed.cfg
+lib64
+include
+.Python
+
+# Installer logs
+pip-log.txt
+
+# Unit test / coverage reports
+.coverage
+.tox
+nosetests.xml
+
+# Translations
+*.mo
+
+# Mr Developer
+.mr.developer.cfg
+.project
+.pydevproject
+
+_darcs
+.boring
+*~
+
+doc/internal
+default.nix
+
+.cmd_history
+
+# IntelliJ IDEA
+.idea
+
+test/examples/*/out
+
+# MacOS
+.DS_Store
+
+
+.swp
+.vscode
+
+#cabal
+dist-newstyle
+cabal.project
+cabal.project.local
+.cabal-updated
+.do_history
+.do.log
+pyvenv.cfg
+sources/aadl
+sources/demangler
+sources/parameterized-utils
+sources/taphoslib
+sources/taphos-aadl
+sources/taphos-d2
+sources/taphos-examples
+sources/taphos-graphviz
+sources/taphos-iosui
+sources/taphos-json
+sources/taphos-llvm
+sources/taphos-stipe
+sources/taphos-summary
+sources/taphos-sysmlv2
+sources/taphos-test-coredefs
+sources/taphos-tui
+sources/valgraph
+taphos-tui.log
+sources/taphos-iosui/test/data
+sources/test-examples/p0/out
+sources/test-examples/p1/out
+sources/test-examples/p2/out
+sources/test-examples/p3/out
+sources/test-examples/p4/out
+lib
+dep
+pubdeps
+subproj
