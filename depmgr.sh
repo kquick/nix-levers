@@ -48,16 +48,20 @@ do_flake_update () {
     if [ -z "$1" ]
     then visibly nix flake update --option tarball-ttl 60
     else
+        # Get all dependencies that are in .root.inputs, hosted by github or
+        # gitlab remotes, and owned by the input parameter.
         deps=$(nix flake metadata --json |
-                   run jq -r ".locks.nodes
-                             | to_entries[]
-                             | select((.value.locked.type == \"github\"
-                                       or
-                                       .value.locked.type == \"gitlab\")
-                                      and
-                                      (.value.locked.owner | ascii_downcase) == \"$1\")
-                             | .key
-                             ")
+                   run jq -r --arg OWNER "$1" \
+                       '.locks.nodes as $nodes
+                       | $nodes.root.inputs
+                       | to_entries[]
+                       | select(.value | type == "string")
+                       | .key as $input
+                       | $nodes[.value].locked
+                       | select((.type == "github" or .type == "gitlab")
+                                and (.owner | ascii_downcase) == $OWNER)
+                       | $input
+                       ')
         if [ -z "$deps" ] ;
         then echo "No dependencies to update for the $1 organization."
         else visibly nix flake update --option tarball-ttl 60 $deps
@@ -73,10 +77,10 @@ do_cabal2nix_flake() {
     do
         repoURL=$(nix flake metadata --json |
                       run jq -r --arg SRC "${INP}" \
-                          ".locks.nodes.[\$SRC].locked
-                          | select (.type == \"gitlab\" or .type == \"github\")
-                          | \"https://\\(.host // \"github.com\")/\\(.owner)/\\(.repo)\"
-                          ")
+                          '.locks.nodes.[$SRC].locked
+                          | select (.type == "gitlab" or .type == "github")
+                          | "https://\(.host // "github.com")/\(.owner)/\(.repo)"
+                          ')
         if [ -z "${repoURL}" ]
         then echo "${INP} is not a valid flake input; skipping"
         else rev=$(nix flake metadata --json |
@@ -88,7 +92,7 @@ do_cabal2nix_flake() {
              then echo Unable to determine cabal2nix target name for ${INP} 1>&2
                   rm ${outdir}/.new.nix
              else mv ${outdir}/.new.nix ${outdir}/${outname}.nix
-                  echo Updated ${outdir}/${outname}.nix
+                  echo "###### Updated ${outdir}/${outname}.nix"
              fi
         fi
     done
