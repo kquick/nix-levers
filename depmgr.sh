@@ -5,12 +5,13 @@ show_usage() {
       echo ""
       echo "Known CMD operations:"
       echo ""
-      echo "  flake_update [organization]"
+      echo "  flake_update [OWNER]"
       echo "      - Updates the flake dependencies to the latest version available"
       echo "        at the flake input (usually a github/gitlab repository).  The"
-      echo "        'organization' specification can be used to filter the"
+      echo "        'OWNER' specification can be used to filter the"
       echo "        set of dependencies to only those provided by the specified"
-      echo "        forge organization (e.g. Galois, taphos, etc.)."
+      echo "        forge organization (e.g. galoisinc, taphos, etc.); note that the"
+      echo "        OWNER must be specified in lowercase."
       echo ""
       echo "  cabal2nix OUTDIR {FLAKE-INPUT ...}"
       echo "      - Outputs a nix deriviation into the target directory for"
@@ -63,7 +64,7 @@ do_flake_update () {
                        | $input
                        ')
         if [ -z "$deps" ] ;
-        then echo "No dependencies to update for the $1 organization."
+        then echo "No dependencies to update for the $1 organization." 1>&2
         else visibly nix flake update --option tarball-ttl 60 $deps
         fi
     fi
