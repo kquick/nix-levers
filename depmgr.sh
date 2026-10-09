@@ -13,10 +13,12 @@ show_usage() {
       echo "        forge organization (e.g. galoisinc, taphos, etc.); note that the"
       echo "        OWNER must be specified in lowercase."
       echo ""
-      echo "  cabal2nix OUTDIR {FLAKE-INPUT ...}"
+      echo "  cabal2nix OUTDIR FLAKE-INPUT [SUBDIR]"
       echo "      - Outputs a nix deriviation into the target directory for"
       echo "        each specified flake input (that is a valid hosted repo)"
-      echo "        at the version in the flake.lock file."
+      echo "        at the version in the flake.lock file.  The optional SUBDIR"
+      echo "        indicates the subdirectory of the input that contains the"
+      echo "        cabal file."
       echo ""
     ) 1>&2
 }
@@ -72,31 +74,54 @@ do_flake_update () {
 }
 
 do_cabal2nix_flake() {
+    # Runs cabal2nix on the specified flake input ($2), writing the output to the
+    # specified output directory ($1).  Parses the flake lockfile to identify the
+    # input and its source and locked revision.  The name of the file written to
+    # the output directory is determined by the Haskell package name in the
+    # processed cabal file.  The optional subdirectory ($3) can specify which
+    # subdirectory of the input source contains the project's cabal file (some
+    # flake inputs contain multiple Haskell packages in different subdirectories;
+    # a cabal2nix is performed for each package separately even though they share
+    # a single flake input).
     outdir="${1}"
-    shift 1
-    for INP in "${*}"
-    do
-        repoURL=$(nix flake metadata --json |
-                      run jq -r --arg SRC "${INP}" \
-                          '.locks.nodes.[$SRC].locked
-                          | select (.type == "gitlab" or .type == "github")
-                          | "https://\(.host // "github.com")/\(.owner)/\(.repo)"
-                          ')
-        if [ -z "${repoURL}" ]
-        then echo "${INP} is not a valid flake input; skipping"
-        else rev=$(nix flake metadata --json |
-                       run jq -r --arg SRC "${INP}" '.locks.nodes.[$SRC].locked.rev')
+    INP="${2}"
+    repoURL=$(nix flake metadata --json |
+                  run jq -r --arg SRC "${INP}" \
+                      '.locks.nodes.[$SRC].locked
+                      | select (.type == "gitlab" or .type == "github")
+                      | "https://\(.host // "github.com")/\(.owner)/\(.repo)"
+                      ')
+    if [ -z "${repoURL}" ]
+    then echo "${INP} is not a valid flake input; skipping"
+    else rev=$(nix flake metadata --json |
+                   run jq -r --arg SRC "${INP}" '.locks.nodes.[$SRC].locked.rev')
+         if [ -z "${3}" ]
+         then
              echo run cabal2nix "${repoURL}" --revision="$rev"
              run cabal2nix "${repoURL}" --revision="$rev" > ${outdir}/.new.nix
+         else
+             echo run cabal2nix "${repoURL}" --revision="$rev" --subpath="$3"
+             run cabal2nix "${repoURL}" --revision="$rev" --subpath="$3" > ${outdir}/.new.nix
+         fi
+         if [ $? -ne 0 ]
+         then
+             echo Errors attempting to run cabal2nix 1>&2
+             return 1
+         else
              outname=$(sed -n -e '/pname =/s/ *pname *= *\"\(.*\)\";/\1/p' ${outdir}/.new.nix)
              if [ -z "${outname}" ]
              then echo Unable to determine cabal2nix target name for ${INP} 1>&2
                   rm ${outdir}/.new.nix
              else mv ${outdir}/.new.nix ${outdir}/${outname}.nix
+                  # The cabal2nix output above is messy and contains errors even on a
+                  # normal run, so be sure to highlight the successful completion
+                  # here.
+                  echo "######"
                   echo "###### Updated ${outdir}/${outname}.nix"
+                  echo "######"
              fi
-        fi
-    done
+         fi
+    fi
 }
 
 case $1 in
