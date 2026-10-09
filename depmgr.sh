@@ -98,20 +98,22 @@ do_cabal2nix_flake() {
          if [ -z "${3}" ]
          then
              echo run cabal2nix "${repoURL}" --revision="$rev"
-             run cabal2nix "${repoURL}" --revision="$rev" > ${outdir}/.new.nix
+             run cabal2nix "${repoURL}" --revision="$rev" > ${outdir}/.new.nix 2> ${outdir}/.new.log
          else
              echo run cabal2nix "${repoURL}" --revision="$rev" --subpath="$3"
-             run cabal2nix "${repoURL}" --revision="$rev" --subpath="$3" > ${outdir}/.new.nix
+             run cabal2nix "${repoURL}" --revision="$rev" --subpath="$3" > ${outdir}/.new.nix 2> ${outdir}/.new.log
          fi
          if [ $? -ne 0 ]
          then
-             echo Errors attempting to run cabal2nix 1>&2
+             echo FAIL: Errors attempting to run cabal2nix 1>&2
+             cat ${outdir}/.new.log
              return 1
          else
+             rm -f ${outdir}/.new.log
              outname=$(sed -n -e '/pname =/s/ *pname *= *\"\(.*\)\";/\1/p' ${outdir}/.new.nix)
              if [ -z "${outname}" ]
              then echo Unable to determine cabal2nix target name for ${INP} 1>&2
-                  rm ${outdir}/.new.nix
+                  rm -f ${outdir}/.new.nix
              else mv ${outdir}/.new.nix ${outdir}/${outname}.nix
                   # The cabal2nix output above is messy and contains errors even on a
                   # normal run, so be sure to highlight the successful completion
@@ -141,4 +143,4 @@ case $1 in
        exit 1;;
 esac
 
-exit 0
+exit $?
