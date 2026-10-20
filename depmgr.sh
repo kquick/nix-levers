@@ -107,12 +107,6 @@ do_cabal2nix_flake() {
              then echo Unable to determine cabal2nix target name for ${INP} 1>&2
                   rm -f ${outdir}/.new.nix
              else mv ${outdir}/.new.nix ${outdir}/${outname}.nix
-                  # The cabal2nix output above is messy and contains errors even on a
-                  # normal run, so be sure to highlight the successful completion
-                  # here.
-                  echo "######"
-                  echo "###### Updated ${outdir}/${outname}.nix"
-                  echo "######"
              fi
          fi
     fi
