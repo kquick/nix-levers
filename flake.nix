@@ -709,7 +709,18 @@
               propagatedBuildInputs = builtins.map getOutOfJail_check
                 (old.propagatedBuildInputs or []);
             });
+      # Extracts the package version from a src cabal file.  Call this with argument
+      # like "${brick-src}/brick.cabal".  Returns "0" if it is unable to find a
+      # version specification in the passed cabal file.
+      cabalversion = srccabal:
+        let cabaldata = builtins.readFile srccabal;
+            cabalvm = builtins.match ".*\nversion:[ \t]+([^\n]+)\n.*" cabaldata;
+        in if builtins.isList cabalvm && builtins.length cabalvm > 0
+           then builtins.head cabalvm
+           else "0";
+
     };
+
 }
 
 # KWQ: allow specifying hackage package override by version alone?
