@@ -34,14 +34,6 @@ run () {
     nix run nixpkgs#${pkg} -- "$@"
 }
 
-# mkDeriv () {
-#     # Older version of cabal->nix which took an owner and repo but assumed github
-#     echo :::: Github $1 / $2 derivation generation;
-#     run cabal2nix https://github.com/${1}/${2} \
-#         --revision=$(nix flake metadata --json |
-#                      run jq -r --arg SRC "${2}-src" '.locks.nodes.[$SRC].locked.rev') \
-#         > ${2}.nix;
-# }
 
 do_flake_update () {
     # Updates flake inputs.  The $1 parameter specifies a repo owner and all
