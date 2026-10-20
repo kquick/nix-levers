@@ -87,26 +87,28 @@ do_cabal2nix_flake() {
     then echo "${INP} is not a valid flake input; skipping"
     else rev=$(nix flake metadata --json |
                    run jq -r --arg SRC "${INP}" '.locks.nodes.[$SRC].locked.rev')
+         newfile="${outdir}/$$.new.nix"
+         logfile="${outdir}/$$.new.log"
          if [ -z "${3}" ]
          then
              echo run cabal2nix "${repoURL}" --revision="$rev"
-             run cabal2nix "${repoURL}" --revision="$rev" > ${outdir}/.new.nix 2> ${outdir}/.new.log
+             run cabal2nix "${repoURL}" --revision="$rev" > ${newfile} 2> ${logfile}
          else
              echo run cabal2nix "${repoURL}" --revision="$rev" --subpath="$3"
-             run cabal2nix "${repoURL}" --revision="$rev" --subpath="$3" > ${outdir}/.new.nix 2> ${outdir}/.new.log
+             run cabal2nix "${repoURL}" --revision="$rev" --subpath="$3" > ${newfile} 2> ${logfile}
          fi
          if [ $? -ne 0 ]
          then
              echo FAIL: Errors attempting to run cabal2nix 1>&2
-             cat ${outdir}/.new.log
+             cat ${logfile}
              return 1
          else
-             rm -f ${outdir}/.new.log
-             outname=$(sed -n -e '/pname =/s/ *pname *= *\"\(.*\)\";/\1/p' ${outdir}/.new.nix)
+             rm -f ${logfile}
+             outname=$(sed -n -e '/pname =/s/ *pname *= *\"\(.*\)\";/\1/p' ${newfile})
              if [ -z "${outname}" ]
              then echo Unable to determine cabal2nix target name for ${INP} 1>&2
-                  rm -f ${outdir}/.new.nix
-             else mv ${outdir}/.new.nix ${outdir}/${outname}.nix
+                  rm -f ${newfile}
+             else mv ${newfile} ${outdir}/${outname}.nix
              fi
          fi
     fi
