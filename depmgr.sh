@@ -40,8 +40,9 @@ do_flake_update () {
     # flake inputs for whom that is the repo owner are updated.  If $1 is not
     # specified *all* flake inputs are updated.
     #
+    fui=${FLAKE_UPDATE_INTERVAL:-240}
     if [ -z "$1" ]
-    then visibly nix flake update --option tarball-ttl 60
+    then visibly nix flake update --option tarball-ttl $fui
     else
         # Get all dependencies that are in .root.inputs, hosted by github or
         # gitlab remotes, and owned by the input parameter.
@@ -59,7 +60,7 @@ do_flake_update () {
                        ')
         if [ -z "$deps" ] ;
         then echo "No dependencies to update for the $1 organization." 1>&2
-        else visibly nix flake update --option tarball-ttl 60 $deps
+        else visibly nix flake update --option tarball-ttl $fui $deps
         fi
     fi
     return 0
