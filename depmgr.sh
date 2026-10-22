@@ -16,6 +16,13 @@ show_usage() {
       echo ""
       echo "  cabal2nix OUTDIR FLAKE-INPUT [SUBDIR]"
       echo "      - Outputs a nix deriviation into the target directory for"
+      echo "        the specified flake input (if it is a valid hosted repo)"
+      echo "        at the version in the flake.lock file.  The optional SUBDIR"
+      echo "        indicates the subdirectory of the input that contains the"
+      echo "        cabal file."
+      echo ""
+      echo "  cabal2nixMany OUTDIR FLAKE-INPUT[/SUBDIR] ..."
+      echo "      - Outputs a nix deriviation into the target directory for"
       echo "        each specified flake input (that is a valid hosted repo)"
       echo "        at the version in the flake.lock file.  The optional SUBDIR"
       echo "        indicates the subdirectory of the input that contains the"
@@ -68,6 +75,32 @@ do_flake_update () {
     return 0
 }
 
+do_cabal2nix_many() {
+    # Runs do_cabal2nix_flake on the set of flake inputs ($*) in parallel,
+    # writing the output to the specified output directory ($1).  Each flake
+    # input argument isthe name of a flake input with an optional /SUBDIR suffix.
+    # If the SUBDIR suffix is present, that is used as the subdirectory of the
+    # input source in which to run the cabal2nix update from.
+    outdir="${1}"
+    shift 1
+    nprocs=0
+    declare -a pids
+    for X in $*
+    do
+        IFS=/ read INP SUBDIR <<<${X}
+        do_cabal2nix_flake ${outdir} ${INP} ${SUBDIR} &
+        pids[$nprocs]=$!
+        nprocs=$(( nprocs + 1))
+    done
+    nfail=0
+    for N in $(seq 0 $((nprocs - 1)))
+    do
+        wait ${pids[$N]} || nfail=$(( nfail + 1 ))
+    done
+    echo Updated $((nprocs - nfail)) of ${nprocs} successfully
+    return ${nfail}
+}    
+                        
 do_cabal2nix_flake() {
     # Runs cabal2nix on the specified flake input ($2), writing the output to the
     # specified output directory ($1).  Parses the flake lockfile to identify the
@@ -88,6 +121,7 @@ do_cabal2nix_flake() {
                       ')
     if [ -z "${repoURL}" ]
     then echo "${INP} is not a valid flake input; skipping"
+         return 1
     else rev=$(nix flake metadata --json |
                    run jq -r --arg SRC "${INP}" '.locks.nodes.[$SRC].locked.rev')
          newfile="${outdir}/$$.new.nix"
@@ -111,10 +145,12 @@ do_cabal2nix_flake() {
              if [ -z "${outname}" ]
              then echo Unable to determine cabal2nix target name for ${INP} 1>&2
                   rm -f ${newfile}
+                  return 1
              else mv ${newfile} ${outdir}/${outname}.nix
              fi
          fi
     fi
+    return 0
 }
 
 case $1 in
@@ -127,6 +163,15 @@ case $1 in
         then echo "Missing arguments; check '$(basename $0) help' info" 1>&2
              exit 1
         else do_cabal2nix_flake "${outdir}" "$@"
+        fi;;
+    cabal2nixMany)
+        shift 1
+        outdir="${1}"
+        shift 1
+        if [ -z "${outdir}" -o "$#" -eq 0 ]
+        then echo "Missing arguments; check '$(basename $0) help' info" 1>&2
+             exit 1
+        else do_cabal2nix_many "${outdir}" "$@"
         fi;;
     help) show_usage;;
     *) echo "UNRECOGNIZED command: '${1}'" 1>&2;
