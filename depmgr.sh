@@ -5,13 +5,14 @@ show_usage() {
       echo ""
       echo "Known CMD operations:"
       echo ""
-      echo "  flake_update [OWNER]"
+      echo "  flake_update [OWNER] ..."
       echo "      - Updates the flake dependencies to the latest version available"
       echo "        at the flake input (usually a github/gitlab repository).  The"
       echo "        'OWNER' specification can be used to filter the"
       echo "        set of dependencies to only those provided by the specified"
       echo "        forge organization (e.g. galoisinc, taphos, etc.); note that the"
-      echo "        OWNER must be specified in lowercase."
+      echo "        OWNER must be specified in lowercase.  Multiple owners may be"
+      echo "        specified on the command-line: each will be updated."
       echo ""
       echo "  cabal2nix OUTDIR FLAKE-INPUT [SUBDIR]"
       echo "      - Outputs a nix deriviation into the target directory for"
@@ -34,20 +35,20 @@ run () {
     nix run nixpkgs#${pkg} -- "$@"
 }
 
-
 do_flake_update () {
-    # Updates flake inputs.  The $1 parameter specifies a repo owner and all
-    # flake inputs for whom that is the repo owner are updated.  If $1 is not
+    # Updates flake inputs.  The parameters specifies repo owners and all flake
+    # inputs for whom that is the repo owner are updated.  If no parameters are
     # specified *all* flake inputs are updated.
     #
     fui=${FLAKE_UPDATE_INTERVAL:-240}
-    if [ -z "$1" ]
+    if [ $# -eq 0 ]
     then visibly nix flake update --option tarball-ttl $fui
     else
         # Get all dependencies that are in .root.inputs, hosted by github or
         # gitlab remotes, and owned by the input parameter.
-        deps=$(nix flake metadata --json |
-                   run jq -r --arg OWNER "$1" \
+        deps=$(for I in $*; \
+               do nix flake metadata --json |
+                   run jq -r --arg OWNER "$I" \
                        '.locks.nodes as $nodes
                        | $nodes.root.inputs
                        | to_entries[]
@@ -57,9 +58,10 @@ do_flake_update () {
                        | select((.type == "github" or .type == "gitlab")
                                 and (.owner | ascii_downcase) == $OWNER)
                        | $input
-                       ')
+                       '; \
+               done)
         if [ -z "$deps" ] ;
-        then echo "No dependencies to update for the $1 organization." 1>&2
+        then echo "No dependencies to update for the $* organization(s)." 1>&2
         else visibly nix flake update --option tarball-ttl $fui $deps
         fi
     fi
@@ -116,7 +118,7 @@ do_cabal2nix_flake() {
 }
 
 case $1 in
-    flake_update) do_flake_update "${2}";;
+    flake_update) shift 1; do_flake_update "$@";;
     cabal2nix)
         shift 1
         outdir="${1}"
