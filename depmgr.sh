@@ -153,10 +153,12 @@ do_cabal2nix_flake() {
     return 0
 }
 
-case $1 in
-    flake_update) shift 1; do_flake_update "$@";;
+cmd="${1}"
+shift 1
+
+case "$cmd" in
+    flake_update) do_flake_update "$@";;
     cabal2nix)
-        shift 1
         outdir="${1}"
         shift 1
         if [ -z "${outdir}" -o "$#" -eq 0 ]
@@ -165,7 +167,6 @@ case $1 in
         else do_cabal2nix_flake "${outdir}" "$@"
         fi;;
     cabal2nixMany)
-        shift 1
         outdir="${1}"
         shift 1
         if [ -z "${outdir}" -o "$#" -eq 0 ]
@@ -174,7 +175,7 @@ case $1 in
         else do_cabal2nix_many "${outdir}" "$@"
         fi;;
     help) show_usage;;
-    *) echo "UNRECOGNIZED command: '${1}'" 1>&2;
+    *) echo "UNRECOGNIZED command: '${cmd}'" 1>&2;
        echo "Use '$(basename $0) help' to get help" 1>&2;
        exit 1;;
 esac
