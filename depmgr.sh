@@ -28,6 +28,9 @@ show_usage() {
       echo "        indicates the subdirectory of the input that contains the"
       echo "        cabal file."
       echo ""
+      echo "  makebom FLAKE_OUTPUT"
+      echo "      - Generates a bill of materials for the specified flake"
+      echo "        output package."
     ) 1>&2
 }
 
@@ -153,6 +156,62 @@ do_cabal2nix_flake() {
     return 0
 }
 
+do_makebom() {
+    # Writes the bill-of-materials for the specified flake output package to stdout.
+    #
+    # There are three parts:
+    #  1. Obtain the source URL for all derivation inputs that have such,
+    #     recursively.
+    #  2. Flake inputs do not create derivation inputs with a URL and hash,
+    #     just plain source checkouts in the nix store.  Instead, the URL
+    #     and hash are in the flake.lock, so extract from there (also
+    #     recursively).
+    #  3. de-duplicate the combined results
+    UFILE=$(mktemp)
+    (nix derivation show -r ${1} | \
+         nix run nixpkgs#jq -- -r '.[] | select(.outputs.out.hash and .env.urls) | .env.urls'
+     collect_flakeinp_urls 0 ${UFILE} $(echo ${1} | sed -e s/#.*//)
+    ) | sort -u
+    if [ "Z${UFILE}" == "Z" ] ; then :; else rm -f ${UFILE}; fi
+}
+
+collect_flakeinp_urls() {
+    nestlvl="${1}"
+    ufile="${2}"
+    flakesrc="${3}"
+    # Get inputs that are public (i.e. github only, no internal gitlab)
+    nix flake metadata --json ${flakesrc} | \
+        nix run nixpkgs#jq -- -r \
+            '.locks.nodes.[].locked
+            | select (.type == "github")
+            | "https://\(.host // "github.com")/\(.owner)/\(.repo)/commit/\(.rev)"
+            '
+    # Recurse into inputs that are themselves flakes (whether public or private).
+    # Skip nixpkgs though: don't need to recurse through *all* packages!
+    subflakes=$(nix flake metadata --json ${flakesrc} | \
+                nix run nixpkgs#jq -- -r \
+                    '.locks.nodes.[]
+                    | select( (has("flake") | not) or (.flake == true))
+                    | .locked
+                    | select ((.type == "gitlab" or .type == "github") and
+                              (.repo == "nixpkgs" | not) )
+                    | "git+ssh://git@\(.host // "github.com")/\(.owner)/\(.repo)?rev=\(.rev)"
+                    ')
+
+    newsubs=$(for S in ${subflakes}; do
+                  if ! grep -q ${S} ${UFILE}
+                  then echo ${S}
+                  fi
+              done)
+    echo ${newsubs} >> ${UFILE}
+
+    for S in ${newsubs}
+    do
+        collect_flakeinp_urls $((nestlvl+1)) "${ufile}" "${S}"
+    done
+}
+                    
+
 cmd="${1}"
 shift 1
 
@@ -173,6 +232,12 @@ case "$cmd" in
         then echo "Missing arguments; check '$(basename $0) help' info" 1>&2
              exit 1
         else do_cabal2nix_many "${outdir}" "$@"
+        fi;;
+    makebom)
+        if [ "$#" -ne 1 ]
+        then echo "Invalid arguments; check '$(basename $0) help' for info" 1>&2
+             exit 1
+        else do_makebom "$1"
         fi;;
     help) show_usage;;
     *) echo "UNRECOGNIZED command: '${cmd}'" 1>&2;
