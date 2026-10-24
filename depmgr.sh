@@ -168,6 +168,7 @@ do_makebom() {
     #     recursively).
     #  3. de-duplicate the combined results
     UFILE=$(mktemp)
+    echo $(echo ${1} | sed -e s/#.*//) > $UFILE
     (nix derivation show -r ${1} | \
          nix run nixpkgs#jq -- -r '.[] | select(.outputs.out.hash and .env.urls) | .env.urls'
      collect_flakeinp_urls 0 ${UFILE} $(echo ${1} | sed -e s/#.*//)
@@ -179,6 +180,24 @@ collect_flakeinp_urls() {
     nestlvl="${1}"
     ufile="${2}"
     flakesrc="${3}"
+    # n.b. Do not re-examine the derivation inputs of this flake because it was
+    # already recursively obtained in do_makebom, and the flake inputs are not
+    # "follows"-locked from the calling flake's specification.
+    #
+    # Uses the ufile for two reasons:
+    #
+    # 1. Ensures that a package whose parent flake already specified this package
+    #    determines the version of that package used.
+    #
+    #    It's possible that the parent did not specify that input as a "follows"
+    #    for the current flake, but that means that either (a) serendipitously
+    #    the flake will be at the same version or (b) the flake is only used in
+    #    sideline outputs (e.g. tests) that do not propagate through the flake
+    #    tree.  Both of these do not invalidate the sbom search.
+    #
+    # 2. De-duplication so that the same packages are not recursively examined
+    #    multiple times (which can slow things down).
+    
     # Get inputs that are public (i.e. github only, no internal gitlab)
     nix flake metadata --json ${flakesrc} | \
         nix run nixpkgs#jq -- -r \
@@ -199,11 +218,12 @@ collect_flakeinp_urls() {
                     ')
 
     newsubs=$(for S in ${subflakes}; do
-                  if ! grep -q ${S} ${UFILE}
+                  srcbase=$(echo ${S} | sed -e s/\?.*//)
+                  if ! grep -q ${srcbase} ${ufile}
                   then echo ${S}
+                       echo ${srcbase} >> ${ufile}
                   fi
               done)
-    echo ${newsubs} >> ${UFILE}
 
     for S in ${newsubs}
     do
