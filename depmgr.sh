@@ -169,9 +169,21 @@ do_makebom() {
     #  3. de-duplicate the combined results
     UFILE=$(mktemp)
     echo $(echo ${1} | sed -e s/#.*//) > $UFILE
-    (nix derivation show -r ${1} | \
-         nix run nixpkgs#jq -- -r '.[] | select(.outputs.out.hash and .env.urls) | .env.urls'
-     collect_flakeinp_urls 0 ${UFILE} $(echo ${1} | sed -e s/#.*//)
+    (
+        # Get the URL(s) of hashed outputs.  The URL(s) are in the .env.urls
+        # field, although sometimes we see env:{__json:"escaped json string"}
+        # instead of env:{..., urls: ""}, and the 'urls' (if any) in the former
+        # are actually a JSON list.
+        nix derivation show -r ${1} | \
+            nix run nixpkgs#jq -- -r \
+                '.[]
+                | select(.outputs.out.hash)
+                | .env.urls
+                  // (.env.__json // "{}" | fromjson | .urls // [] | add)
+                  // empty
+                '
+        # Now recursively process flake inputs.
+        collect_flakeinp_urls 0 ${UFILE} $(echo ${1} | sed -e s/#.*//)
     ) | sort -u
     if [ "Z${UFILE}" == "Z" ] ; then :; else rm -f ${UFILE}; fi
 }
