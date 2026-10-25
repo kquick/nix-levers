@@ -116,6 +116,7 @@ do_cabal2nix_flake() {
     # a single flake input).
     outdir="${1}"
     INP="${2}"
+    tdir="$(mktemp -d)"
     repoURL=$(nix flake metadata --json |
                   run jq -r --arg SRC "${INP}" \
                       '.locks.nodes.[$SRC].locked
@@ -127,8 +128,8 @@ do_cabal2nix_flake() {
          return 1
     else rev=$(nix flake metadata --json |
                    run jq -r --arg SRC "${INP}" '.locks.nodes.[$SRC].locked.rev')
-         newfile="${outdir}/$$.new.nix"
-         logfile="${outdir}/$$.new.log"
+         newfile="${tdir}/$$.new.nix"
+         logfile="${tdir}/$$.new.log"
          if [ -z "${3}" ]
          then
              echo run cabal2nix "${repoURL}" --revision="$rev"
@@ -141,18 +142,19 @@ do_cabal2nix_flake() {
          then
              echo FAIL: Errors attempting to run cabal2nix 1>&2
              cat ${logfile}
+             [ -d "${tdir}" ] && rm -rf "${tdir}" || :
              return 1
          else
-             rm -f ${logfile}
              outname=$(sed -n -e '/pname =/s/ *pname *= *\"\(.*\)\";/\1/p' ${newfile})
              if [ -z "${outname}" ]
              then echo Unable to determine cabal2nix target name for ${INP} 1>&2
-                  rm -f ${newfile}
+                  [ -d "${tdir}" ] && rm -rf "${tdir}" || :
                   return 1
              else mv ${newfile} ${outdir}/${outname}.nix
              fi
          fi
     fi
+    [ -d "${tdir}" ] && rm -rf "${tdir}" || :
     return 0
 }
 
