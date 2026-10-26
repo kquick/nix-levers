@@ -180,8 +180,9 @@ do_makebom() {
             nix run nixpkgs#jq -- -r \
                 '.[]
                 | select(.outputs.out.hash)
-                | .env.urls
-                  // (.env.__json // "{}" | fromjson | .urls // [] | add)
+                | .env.url
+                  // env.urls.[0]
+                  // (.env.__json // "{}" | fromjson | .url // .urls[0] // [])
                   // empty
                 '
         # Now recursively process flake inputs.
