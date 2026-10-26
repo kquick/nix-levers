@@ -176,7 +176,7 @@ do_makebom() {
         # field, although sometimes we see env:{__json:"escaped json string"}
         # instead of env:{..., urls: ""}, and the 'urls' (if any) in the former
         # are actually a JSON list.
-        nix derivation show --no-update-lockfile -r ${1} | \
+        nix derivation show --no-update-lock-file -r ${1} | \
             nix run nixpkgs#jq -- -r \
                 '.[]
                 | select(.outputs.out.hash)
@@ -213,7 +213,7 @@ collect_flakeinp_urls() {
     #    multiple times (which can slow things down).
     
     # Get inputs that are public (i.e. github only, no internal gitlab)
-    nix flake metadata --no-update-lockfile --json ${flakesrc} | \
+    nix flake metadata --no-update-lock-file --json ${flakesrc} | \
         nix run nixpkgs#jq -- -r \
             '.locks.nodes.[].locked
             | select (.type == "github")
@@ -221,7 +221,7 @@ collect_flakeinp_urls() {
             '
     # Recurse into inputs that are themselves flakes (whether public or private).
     # Skip nixpkgs though: don't need to recurse through *all* packages!
-    subflakes=$(nix flake metadata --no-update-lockfile --json ${flakesrc} | \
+    subflakes=$(nix flake metadata --no-update-lock-file --json ${flakesrc} | \
                 nix run nixpkgs#jq -- -r \
                     '.locks.nodes.[]
                     | select( (has("flake") | not) or (.flake == true))
